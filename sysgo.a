@@ -1,0 +1,355 @@
+********************************************************************
+* SysGo - Kickstart program module
+*
+* $Id$
+*
+* Edt/Rev  YYYY/MM/DD  Modified by
+* Comment
+* ------------------------------------------------------------------
+*   5      1998/10/12  Boisy G. Pitre
+* Taken from OS-9 L2 Tandy distribution and modified banner for V3.
+*
+*   5r2    2003/01/08  Boisy G. Pitre
+* Fixed fork behavior so that if 'shell startup' fails, system doesn't
+* jmp to Crash, but tries AutoEx instead.  Also changed /DD back to /H0
+* for certain boot floppy cases.
+*
+*          2003/09/04  Boisy G. Pitre
+* Back-ported to OS-9 Level One.
+*
+*   5r3    2003/12/14  Boisy G. Pitre
+* Added SHIFT key check to prevent startup/autoex from starting if
+* held down.  Gene Heskett, this Bud's for you.
+*
+*   xxx    2020/09/15  Bill Nobel
+* Major re-write to change ordering of text and amount.
+* Added text to show boot progress.  Added support for a config file.
+*
+
+nfiles      equ     2           stdin and stdout at least
+stk         equ     nfiles*256+128+256 stdin,stdout,stderr and fudge
+
+            psect   _sysgo,$11,$81,3,stk,Start
+
+            ifp1
+            use     deffile
+            endc
+
+* Main entry from OS-9 boot
+*
+
+Start:
+* clear out DP
+            pshs    u               save data pointer
+            clra
+            clrb
+sys0100     sta     ,u+
+            decb
+            bne     sys0100
+            puls    u
+            stu     <gMemPtr        save Mem ptr. (don't really use it)
+            leax    >IcptRtn,pc     set signal trap
+           ifeq    Debug
+            os9     F$Icpt
+           endc
+* Set system default priority
+* can be change from config file
+            os9     F$ID
+            ldb     #DefPrior
+            stb     <gDefSPri       save it in default area
+            os9     F$SPrior
+* Initialize all system default command parameters
+            lbsr    InitDflt
+* get my current screen type/size
+            lda     #1
+            ldb     #SS.ScTyp       get screen type
+            os9     I$GetStt
+            bcc     sys0200         no error skip
+* Must be a VDG or other serial console
+            lda     #-1             flag console is not a window
+sys0200     sta     <gScrTyp        save screen type
+            lda     #1              get screen/terminal size
+            ldb     #SS.ScSiz
+            os9     I$GetStt
+            stx     <gScrXSiz       save it for later
+            sty     <gScrYSiz       save it for later
+* get foreground, background and border colors
+            ldb     #SS.FBRgs
+            os9     I$GetStt
+            sta     <gDefFClr
+            stb     <gDefBClr
+            tfr     x,d
+            stb     <gDefBdClr
+* Set default time (starts multitasking)
+            leax    >DefTime,pc
+            os9     F$STime         set time to default
+* At this point we need some default devices to get
+* info and programs from the Disk/Hard disk to continue
+* set execution directory
+            leax    >defExeDir,pc
+            lda     #EXEC.
+            os9     I$ChgDir        change exec. dir
+* Made READ. so that no write occurs at boot (Boisy on Feb 5, 2012)
+            leax    >defDatDir,pc
+            lda     #READ.
+            os9     I$ChgDir        change data dir.
+            bcs     mapBlk          error get system block
+            leax    >defHDDir,pc
+            lda     #EXEC.
+            os9     I$ChgDir        change exec. dir to HD
+* map system block 0
+mapBlk      ldx     #$0000          map in system block 0
+            ldb     #$01
+            os9     F$MapBlk
+            stu     <gSysBlk        save address
+* set reset flag
+            lda     #$55            set reset flag for Color BASIC
+            sta     <D.CBStrt,u
+* get my process descriptor
+            os9     F$ID            get process ID
+            ldx     #gPrcDesc
+            os9     F$GPrDsc        get process descriptor copy
+* set I/O pointers from current paths to system
+           ifeq    Debug
+            lbsr    SetIO           set IO pointers
+           endc
+* open config file
+            lbsr    Cls             clear screen
+            leax    cfgPath,pc      point to pathname
+            lda     #READ.
+            os9     I$Open          open it
+            bcs     noCfg           no config, error msg
+            sta     <gCfgPth        save path to file
+* read config
+            leax    txtCfgRd,pc
+            lbsr    Print
+* read a line from env.file
+cfgLoop     ldx     #gCfgBuff       point to buffer
+            ldy     #256
+            clrb
+            lbsr    MEMSET          clear buffer to null (prvents overlap)
+            lda     <gCfgPth
+            ldy     #250
+            lbsr    FGETS           read line
+            bcc     gotLin          no error, skip
+            cmpb    #E$EOF          eof?
+            bne     noteof          no, exit return error
+            clrb                    clear carry on eof.
+* error or eof, close file and continue
+noteof      lda     <gCfgPth
+            os9     I$Close
+            bra     setWindow
+* process one command line from config file
+gotLin      ldx     #gCfgBuff       point to buffer
+            ldy     #gErrBuff
+            lbsr    STRCPY
+            ldx     #gCfgBuff       point to start of line
+            lda     ,x              get first character
+            cmpa    #C$CR           blank (GShell & Control don't handle)
+            beq     cfgLoop         yes read next line
+            cmpa    #'*             comment?
+            beq     cfgLoop         yes read next line
+            lbsr    TO_UPPRS        convert line to uppercase
+            lbsr    ProcCfg         process line keyword
+            bcc     cfgLoop         no error, get next line
+* keyword error
+            leax    cfgErr,pc       point to Config file err...
+            lbsr    Print
+            ldx     #gErrBuff       print the line from env.file
+            ldy     #255
+            lda     #1
+            os9     I$WritLn
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            bra     noteof          close and go on
+* no env.file error
+noCfg       leax    txtNoCfg,pc
+            lbsr    Print
+
+* now set device window based on user setting or default to terminal
+* window from i.e. RS232 pak
+setWindow   lda     <gScrTyp        get my current screen type
+            lbmi    cWin0400        not a window, skip device window setup
+* change device window to default setting from env.file
+chgWin      lda     <gDefCType      get type from env.file
+            cmpa    #1              is it 40 column
+            bne     chg0300         no, check 80 column
+* check X and Y size for 40 column screens
+            ldb     <gDefCXSiz      get X size
+            cmpb    #40             within max?
+            bls     chg0100         yes, check Y size
+            leax    txtCTypXEr,pc   point to X error
+            lbsr    Print
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            ldx     #defPseTim
+            os9     F$Sleep
+            bra     chg0800         carry on with defaults
+chg0100     ldb     <gDefCYSiz      get Y size
+           ifne MATCHBOX
+            cmpb    #25
+           else
+            cmpb    #25
+           endc
+            bls     chg0700         yes, change window and carry on
+            leax    txtCTypYEr,pc   point to Y size error
+            lbsr    Print
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            ldx     #defPseTim
+            os9     F$Sleep
+chg0200     bra     chg0800         don't change window, but carry on
+* check X and Y size for 80 column screens (Y has max of 60 as per Matchbox)
+chg0300     cmpa    #2              80xY?
+            beq     chg0400         yes, skip ahead
+            leax    txtCTypErr,pc
+            lbsr    Print
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            ldx     #defPseTim
+            os9     F$Sleep
+            bra     chg0800
+chg0400     ldb     <gDefCXSiz      get X size
+            cmpb    #80             within max?
+            bls     chg0500         yes, check Y size
+            leax    txtCTypXEr,pc   point to X error
+            lbsr    Print
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            ldx     #defPseTim
+            os9     F$Sleep
+            bra     chg0800         carry on with defaults
+chg0500     ldb     <gDefCYSiz      get Y size
+           ifne MATCHBOX
+            cmpb    #60
+           else
+            cmpb    #25
+           endc
+            bls     chg0700
+            leax    txtCTypXEr,pc   point to X error
+            lbsr    Print
+            leax    txtErrPse,pc
+            lbsr    Print
+            lbsr    GETC
+            ldx     #defPseTim
+            os9     F$Sleep
+            bra     chg0800         carry on with defaults
+chg0700     lbsr    SetMod          set /Term using I$ModDsc & redo paths
+* get screen size (could have been changed from env.file)
+chg0800     lda     #1              get screen/terminal size
+            ldb     #SS.ScSiz
+            os9     I$GetStt
+            stx     <gScrXSiz       update local copy of size
+            sty     <gScrYSiz
+* set monitor type
+            lda     <gScrTyp
+            bmi     cWin0400
+cWin0300    clra
+            ldb     <gDefMTyp       get monitor type
+            tfr     d,x
+            lda     #1              set it
+            ldb     #SS.Montr
+            os9     I$SetStt
+*           lbsr    setDPal         set default palettes
+* Show main banner (window type and size sensative)
+* does not care what console device is or size. It resonds itself
+cWin0400    lbsr    ShowBanr
+* We already have drive settings from env.file so now we can set
+* them accordingly to what user specified. If they didn't set them
+* It still has the system defaults.
+* first set env.file data to system.
+            leax    txtSetCfg,pc
+            lbsr    PrintVrb
+            lbsr    SetCfg          set configuration from mem/config file
+            ldb     <gDefFClr
+            lbsr    FColor
+            ldb     <gDefBClr
+            lbsr    BColor
+* now set default EXE/Data directories.
+            leax    txtDExe,pc
+            lbsr    PrintVrb
+            leax    >defExeDir,pc
+            lda     #EXEC.
+            os9     I$ChgDir        change exec. dir
+* Made READ. so that no write occurs at boot (Boisy on Feb 5, 2012)
+            leax    txtDDat,pc
+            lbsr    PrintVrb
+            leax    >defDatDir,pc
+            lda     #READ.
+            os9     I$ChgDir        change data dir.
+            bcs     set0100
+            leax    >defHDDir,pc
+            lda     #EXEC.
+            os9     I$ChgDir        change exec. dir to HD
+set0100
+           ifeq    Debug
+            lbsr    SetIO
+           endc
+* Added 12/14/03: If SHIFT is held down, startup is not run (CoCo only)
+            leax    txtSetCfg,pc
+            lbsr    Print
+            lda     #$01            standard output
+            ldb     #SS.KySns
+            os9     I$GetStt
+            bcs     DoStartup
+            bita    #%00000001      SHIFT key down?
+            bne     FrkShell        Yes, don't to startup or autoex
+* Fork Startup here
+DoStartup
+           ifeq    Debug
+            leax    txtStartup,pc
+            lbsr    PrintVrb
+            ldx     #gDefShell
+            ldu     #gDefStrtup
+            ldd     #256
+            ldy     gStartLen
+            os9     F$Fork
+            bcs     DoAuto          Startup failed..
+            os9     F$Wait
+* Fork AutoEx here
+DoAuto
+            leax    txtAutoEx,pc
+            lbsr    PrintVrb
+            ldx     #gDefAutoEx
+            ldu     #gAutoPrm
+            ldd     #$0100
+            ldy     gAutoPrmL
+            os9     F$Fork
+            bcs     FrkShell        AutoEx failed..
+            os9     F$Wait
+           endc
+* Fork Final Shell here
+FrkShell
+            leax    txtShell,pc
+            lbsr    PrintVrb
+           ifeq    Debug
+            ldx     #gDefShell      get shell setting
+            ldd     #$0100
+            ldy     #ShellPL        get parameter length
+            leau    ShellPrm,pc     point to parameters
+            os9     F$Chain         Level 2/3. Should not return..
+            ldb     #$06            it did! Fatal. Load error code
+            lbra    Crash
+           else
+            os9     F$Exit
+           endc
+
+* crash machine
+CrashE:
+            ldb     #$04
+Crash:
+            clr     >$ff48
+            ldu     <gSysBlk
+            jmp     <D.Crash,u
+
+* Signal intercept routine
+IcptRtn:
+            rti
+
+            endsect
+

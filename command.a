@@ -1,0 +1,526 @@
+*
+*
+*
+
+            psect   _command,0,0,0,0,0
+
+            ifp1
+            use     deffile
+            endc
+
+* Change keyboard repeat start delay from env.file
+*
+* Entry: X = pointer to keyword
+*        Y = pointer to line read from env.file
+*            bumped to after '=' sign from keyword
+*
+chgKeyD:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #5
+            bhi     errRepStr
+            decb
+            leax    sdlyTab,pc
+            lda     b,x             get actual start delay
+            sta     <gDefKeyD       save it
+            clra
+            rts
+errRepStr   coma                    set carry
+            rts
+* keyboard start delay table from gshell/control
+sdlyTab     fcb     0,45,30,20,10
+
+* Change keyboard repeat speed from env.file
+*
+* Entry:
+*
+chgKeyS:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #5
+            bhi     errRepSpd
+            decb
+            leax    sspdTab,pc
+            lda     b,x             get actual start delay
+            sta     <gDefKeyS       save it
+            clra
+            rts
+errRepSpd   coma                    set carry
+            rts
+* keyboard repeat speed table from gshell/control
+sspdTab     fcb     24,12,6,3,2
+
+* Change keyboard click from env.file
+*
+* Entry:
+*
+chgKeyC:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #1
+            bhi     errKeyC
+            stb     <gDefKeyC       save it
+            clra
+            rts
+errKeyC     coma                    set carry
+            rts
+
+* Change pointer side from env.file
+*
+* Entry:
+*
+chgMseP:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #2
+            bhi     errMseP
+            stb     <gDefMseP       save it
+            clra
+            rts
+errMseP     coma                    set carry
+            rts
+
+* Change pointer resolution from env.file
+*
+* Entry:
+*
+chgMseR:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #1
+            bhi     errMseR
+            stb     <gDefMseR       save it
+            clra
+            rts
+errMseR     coma                    set carry
+            rts
+
+* Change pointer sample rate from env.file
+*
+* Entry:
+*
+chgMseS:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpd    #255
+            bhi     errMseS
+            stb     <gDefMseS       save it
+            clra
+            rts
+errMseS     coma                    set carry
+            rts
+
+* Change pointer button timeout from env.file
+*
+* Entry:
+*
+chgMseT:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpd    #255
+            bhi     errMseT
+            stb     <gDefMseT       save it
+            clra
+            rts
+errMseT     coma                    set carry
+            rts
+            rts
+
+* Change mouse second button action from env.file
+*
+* Entry:
+*
+chgMSec:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #1              past max value?
+            bhi     errMseC
+            stb     <gDefMseC       save it
+            clra
+            rts
+errMseC     coma                    set carry
+            rts
+
+* Change monitor type from env.file
+*
+* Entry:
+*
+chgMTyp:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #2              past max value?
+            bhi     errMTyp
+            stb     <gDefMTyp       save it
+            clra
+            rts
+errMTyp     coma                    set carry
+            rts
+
+* Change system priority from env.file
+*
+* Entry:
+*
+chgSPri:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpd    #255            past max value?
+            bhi     errSPri
+            stb     <gDefSPri       save it
+            clra
+            rts
+errSPri     coma                    set carry
+            rts
+
+* Change module CRC from env.file
+*
+* Entry:
+*
+chgMCrc:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #2              past max value?
+            bhi     errMCrc
+            stb     <gDefMCRC       save it
+            clra
+            rts
+errMCrc     coma                    set carry
+            rts
+
+* Change data directory from env.file
+*
+* Entry:
+*
+chgDatD:
+            tfr     y,x             move data pointer to X
+            ldy     #gDefDir        where to put it
+            lbsr    STRCPY          move it
+            clra
+            rts
+
+* Change exec directory from env.file
+*
+* Entry:
+*
+chgExeD:
+            tfr     y,x             move data pointer to X
+            ldy     #gDefExe        where to put it
+            lbsr    STRCPY          move it
+            clra
+            rts
+
+* Change console shell from env.file
+*
+* Entry:
+*
+chgShel:
+            tfr     y,x             move data pointer to X
+            ldy     #gDefShell      where to put it
+            lbsr    STRCPY          move it
+            clra
+            rts
+
+* Change console shell parameters from env.file
+*
+* Entry:
+*
+chgShPrm:
+            tfr     y,x             move data pointer to X
+            ldy     #gShelPrm       where to put it
+            lbsr    STRCPY          move it
+            ldx     #gShelPrm
+            lbsr    STRLEN
+            std     gShelPL         save it
+            clra
+            rts
+
+* Change startup file from env.file
+*
+* Entry:
+*
+chgStrt:
+            tfr     y,x             move data pointer to X
+            ldy     #gDefStrtup     where to put it
+            lbsr    STRCPY          move it
+            ldx     #gDefStrtup
+            lbsr    STRLEN
+            std     gShelPL         save it
+            clra
+            rts
+
+* Change AutoExec from env.file
+*
+* Entry:
+*
+chgAuto:
+            tfr     y,x             move data pointer to X
+            ldy     #gDefAutoEx     where to put it
+            lbsr    STRCPY          move it
+            clra
+            rts
+
+* Change AutoExec parameter from env.file
+*
+* Entry:
+*
+chgAutoP:
+            tfr     y,x             move data pointer to X
+            ldy     #gAutoPrm       where to put it
+            lbsr    STRCPY          move it
+            ldx     #gAutoPrm
+            lbsr    STRLEN
+            std     gShelPL         save it
+            clra
+            rts
+
+* Load a module from from env.file
+*
+* Entry:
+*
+chgModLd:
+            tfr     y,x             move data pointer to X
+            pshs    x               save it for a moment
+            leax    txtModLd,pc     point to 'Loading - '
+            lbsr    Print
+            ldx     ,s              get module name
+            lbsr    Print
+            lbsr    PutLF
+            puls    x
+            lda     #Prgrm+Objct
+            os9     F$Load
+            bcc     gotLd
+            coma                    set carry
+            rts
+gotLd       clra                    clear carry
+            rts
+
+* Change palette entry from env.file
+*
+* Entry:
+*
+chgPal:
+            tfr     y,x             move data pointer to X
+            lbsr    cnvPal          convert palette line data
+            bcs     errPal          error, skip
+            ldy     #gDefPal        point to palette registers
+            stb     a,y             save the color in table
+            clra                    clear carry
+            rts
+errPal      comb                    set carry
+            rts
+
+* Change text Verbose mode from env.file
+*
+* Entry:
+*
+chgVrbs:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #1              past max value?
+            bhi     errVrbs
+            stb     <gDefVerb       save it
+            clra
+            rts
+errVrbs     coma                    set carry
+            rts
+
+* Change device type from env.file
+*
+* Entry:
+*
+chgCTyp:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            tstb
+            beq     errCTyp
+            cmpb    #2              past max value?
+            bhi     errCTyp
+            stb     <gDefCType      save it
+            clra
+            rts
+errCTyp     coma                    set carry
+            rts
+
+* Change device X sice from env.file
+*
+* Entry:
+*
+chgCXSiz:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #80             past max value?
+            bhi     errXSiz
+            stb     <gDefCXSiz      save it
+            clra
+            rts
+errXSiz     coma                    set carry
+            rts
+
+* Change device Y sice from env.file
+*
+* Entry:
+*
+chgCYSiz:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #25             past max value?
+            bhi     errYSiz
+            stb     <gDefCYSiz      save it
+            clra
+            rts
+errYSiz     coma                    set carry
+            rts
+
+* Change device Foreground color from env.file
+*
+* Entry:
+*
+chgFClr:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #16             past max value?
+            bhi     errFClr
+            stb     <gDefFClr       save it
+            clra
+            rts
+errFClr     coma                    set carry
+            rts
+
+* Change device Backbground color from env.file
+*
+* Entry:
+*
+chgBClr:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #16             past max value?
+            bhi     errBClr
+            stb     <gDefBClr       save it
+            clra
+            rts
+errBClr     coma                    set carry
+            rts
+
+* Change device Border color from env.file
+*
+* Entry:
+*
+chgBdClr:
+            tfr     y,x             move pointer to data to X
+            lbsr    DEC_BIN         convert it
+            cmpb    #16             past max value?
+            bhi     errBdClr
+            stb     <gDefBdClr      save it
+            clra
+            rts
+errBdClr    coma                    set carry
+            rts
+
+
+
+
+
+
+
+
+
+
+
+
+
+* Convert palette line data from env.file
+*
+* Entry: X = pointer to text data.
+*            (points to 'xx=x,x,x')
+* Exit:  A = palette register #
+*        B = converted color #
+*
+
+* local data area on stack
+            csect
+palEnt      rmb     1               palette entry #
+palClr      rmb     1               palette color
+palRed      rmb     1               RGB red value
+palBlu      rmb     1               RGB blue value
+palGrn      rmb     1               rgb green value
+palRPtr     rmb     2               point to decimal red value
+palBPtr     rmb     2               pointer to decimal blue value
+palGPtr     rmb     2               pointer to decimal green value
+palSiz      equ     *               size of local area
+            endsect
+
+cnvPal:
+            pshs    x               save pointer to text data
+            leas    -palSiz,s       make room on stack for locals
+            tfr     x,y             copy start pointer
+* first get pointers to palette entry #
+pal0100     lda     ,x+             get a digit of palette #
+            cmpa    #'=             is it equal sign?
+            bne     pal0100         no, keep looking
+            clr     -1,x            terminate entry #
+            stx     palRPtr,s       save pointer to red value
+pal0200     lda     ,x+             get a decimal digit
+            cmpa    #',             comma?
+            bne     pal0200         no, keep looking
+            clr     -1,x            terminate red value
+            stx     palGPtr,s       save pointer to green value
+pal0300     lda     ,x+
+            cmpa    #',             comma?
+            bne     pal0300         no, keep looking
+            clr     -1,x
+            stx     palBPtr,s       save pointer to blue value
+* convert decimal palette entry #
+            tfr     y,x             restore pointer to entry #
+            lbsr    DEC_BIN         convert entry #
+            bcs     errCPal
+            cmpb    #15             too big?
+            bhi     errCPal
+            stb     palEnt,s
+* convert red decimal value
+            ldx     palRPtr,s       get pointer to red value
+            lbsr    DEC_BIN         convert it
+            bcs     errCPal
+            cmpb    #3              past max?
+            bhi     errCPal         yes, error out
+            stb     palRed,s        save it
+* convert green decimal value
+            ldx     palGPtr,s       get pointer to red value
+            lbsr    DEC_BIN         convert it
+            bcs     errCPal
+            cmpb    #3              past max?
+            bhi     errCPal         yes, error out
+            stb     palGrn,s        save it
+* convert blue decimal value
+            ldx     palBPtr,s       get pointer to red value
+            lbsr    DEC_BIN         convert it
+            bcs     errCPal
+            cmpb    #3              past max?
+            bhi     errCPal         yes, error out
+            stb     palBlu,s        save it
+* now convert the 3 color values to a color #
+            clr     palClr,s        clear out color #
+            lda     palRed,s        get red value
+            lsla                    shift it left 4 bits
+            lsla
+            lsla
+            lsla
+            ora     palClr,s        merge it into color #
+            sta     palClr,s        update color #
+            lda     palGrn,s        get green value
+            lsla                    shift it left 2 bits
+            lsla
+            ora     palClr,s        merge it into color #
+            sta     palClr,s        update color #
+            lda     palBlu,s        get blue value
+            ora     palClr,s        merge it into color #
+            sta     palClr,s        update color #
+* return with
+            lda     palEnt,s
+            ldb     palClr,s
+            leas    palSiz,s        purge stack of locals
+            andcc   #%11111110      clear carry
+            puls    x,pc            restore & return
+errCPal     leas    palSiz,s        purge stack
+            comb                    set carry
+            puls    x,pc            return
+
+            endsect

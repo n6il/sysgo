@@ -1,0 +1,425 @@
+
+            psect   _text,0,0,0,0,0
+
+            ifp1
+            use     deffile
+            endc
+
+DefTime:    fcb     $72,$04,$0d,$15,$28,$35
+
+defPalRGB:  fcb     63,1,0,18,36,54,45,27
+defPalCMP:  fcb     63,1,0,18,36,54,45,27
+
+txtDWSet:   fdb     $1b24           DWEnd
+            fdb     $1b20           DWSet
+            fcb     defCTyp         get default screen type
+            fdb     0               start X,Y
+            fcb     defCXSz         default X size
+            fcb     defCYSz         default Y size
+            fcb     defFClr         default Fore color
+            fcb     defBClr         default Back color
+            fcb     defBdClr        default Border color
+            fdb     $1b21           DW Select
+txtDWStSz:  equ     *-txtDWSet
+
+txtDebug:   fcc     /Found./
+            fdb     $0d0a
+            fcb     0
+
+* Main Banner section
+txtHdr1:    fcc     /Nitros9 - Level 2 EOU 1.0.B6/
+            fcb     0
+txtHdr2:    fcc     /Ease of Use Edition/
+            fcb     0
+txtHdr3:    fcc     /(C) 2014 The NitrOS-9 Project/
+            fcb     0
+txtHdr4:    fcc     "http://www.nitros9.org"
+            fcb     0
+txtHdr5:    fcc     /(C) 2020 Ease of Use Project/
+            fcb     0
+txtHdr6:    fcc     "lcurtisboyle.com/nitros9/nitros9.html"
+            fcb     0
+
+txtMulti:   fcc     /Starting multitasking core.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtMSize:
+            fcc     /Memory size - /
+            fcb     0
+
+txtM2048k:  fcc     /2048k./
+            fcb     C$CR,C$LF
+            fcb     0
+txtM128k:   fcc     /128k./
+            fcb     C$CR,C$LF
+            fcb     0
+txtM256k:   fcc     /256k./
+            fcb     C$CR,C$LF
+            fcb     0
+txtM512k:   fcc     /512k./
+            fcb     C$CR,C$LF
+            fcb     0
+txtM1024k:  fcc     /1024k./
+            fcb     C$CR,C$LF
+            fcb     0
+txtMUnk:    fcc     /????/
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtDrvWire: fcc     /Drivewire - /
+            fcb     0
+
+txtDwNo:    fcc     /Not detected./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtDWIO:    fcc     /dwio/
+            fcb     0
+
+txtDwX0:    fcc     "x0"
+            fcb     0
+
+txtDwYes:   fcc     /(Installed) /
+            fcb     0
+
+txtDwSrv:   fcc     /(Active) V-/
+            fcb     0
+
+txtDwNSrv:  fcc     /(Inactive) - Checking/
+            fcb     0
+
+txtBKSpc:   fcb     8,8,8,8,8,8,8,8,8,8
+            fcb     8,8,8,8,8,8,8,8,8,8
+            fcb     8,8,8,8,8,8,8,8,8,8
+
+txtDwChk:   fcb     C$CR,C$LF
+            fcc     /*** Check DW Server PC for startup ***/
+            fcb     C$CR,C$LF
+            fcc     /Press any key when ready./
+            fcb     0
+
+txtCPU:     fcc     /Cpu type - /
+            fcb     0
+
+txtCPU63:   fcc     /6309 /
+            fcb     0
+
+txt6363:    fcc     /(Native Mode)/
+            fcb     C$CR,C$LF
+            fcb     0
+
+txt6368:    fcc     /(6809 Mode)/
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCPU68:   fcc     /6809/
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCCSdc:   fcc     /Coco SDC - /
+            fcb     0
+txtNoSDC:   fcc     /Not detected./
+            fcb     C$CR,C$LF
+            fcb     0
+txtGotSDC:  fcc     /Detected./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtGimeX:   fcc     /Gime-X - /
+            fcb     0
+txtNGimeX:  fcc     /Not found./
+            fcb     C$CR,C$LF
+            fcb     0
+txtFGimeX:  fcc     /Detected. Ver. /
+            fcb     0
+
+txtDExe:
+            fcb     C$CR,C$LF
+            fcc     /Setting default execution directory.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+defExeDir:  fcc     /cmds/
+            fcb     C$CR
+            fcb     0
+
+txtDDat:
+            fcc     /Setting default data directory.../
+            fcb     C$CR,C$LF
+            fcb     0
+txtDDatL:   equ     *-txtDDat
+
+defDatDir:  fcc     "/dd"
+            fcb     C$CR
+            fcb     0
+
+txtHDDef:
+            fcc     /Getting default data directory.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+defHDDir:   fcc     "/dd/cmds"
+            fcb     C$CR
+            fcb     0
+
+setIO:      fcc     "Setting up system default I/O paths..."
+            fcb     C$CR,C$LF
+            fcb     0
+
+Shell:
+            fcc     /Shell/
+            fcb     C$CR
+            fcb     0
+
+ShellPrm:
+            fcc     "i=/1"
+            fcb     C$CR
+            fcb     0
+ShellPL:    equ     *-ShellPrm
+
+AutoEx:
+            fcc     /AutoEx/
+            fcb     C$CR
+            fcb     0
+
+AutoExPrm:
+            fcc     //
+            fcb     C$CR
+            fcb     0
+AutoPL:     equ     *-AutoExPrm
+
+Startup:
+            fcc     /startup -p/
+            fcb     C$CR
+            fcb     0
+StartupL:   equ     *-Startup
+
+* config file pathname
+cfgPath:    fcc     "/dd/sys/env.file"
+            fcb     C$CR
+            fcb     0
+
+txtCfgFile:
+            fcb     C$CR,C$LF
+            fcc     /Attempting to open config file.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtNoCfg:   fcc     /No config file, using system defaults./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCfgRd:
+            fcc     /Reading config file.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+cfgErr:     fcc     /Error in config file.../
+            fcb     C$CR
+            fcc     /Line: /
+            fcb     0
+
+txtErrPse:  fcc     /Press any key... /
+            fcb     0
+
+txtModLd:   fcc     /Loading - /
+            fcb     0
+
+txtSetCfg:  fcc     /Setting configuration settings.../
+            fcb     C$CR,C$LF
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCTypErr: fcc     /Error only supports types 1 & 2 windows./
+            fcb     C$CR,C$LF
+            fcc     /Can't change Window./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCTypXEr: fcc     /Error window X size to big./
+            fcb     C$CR,C$LF
+            fcc     /Can't change Window./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtCTypYEr: fcc     /Error window Y size to big./
+            fcb     C$CR,C$LF
+            fcc     /Can't change Window./
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtShift:   fcc     /Startup files can be bypassed by holding down SHIFT./
+            fcb     C$CR,C$LF
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtStartup: fcc     /Executing startup file.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtAutoEx:  fcc     /Executing AutoEx file.../
+            fcb     C$CR,C$LF
+            fcb     0
+
+txtShell:   fcc     /Executing final console shell./
+            fcb     C$CR,C$LF
+            fcb     0
+
+* config file keyword vectors
+*
+* each entry consists of 4 bytes
+*
+*   first 2 are offset to keyword text.
+*   next 2 are offset to routine to handle keyword
+*
+cfgKeys:
+            fdb     defkeyd-*       repeat start delay
+            fdb     chgKeyD-*       change key start delay
+
+            fdb     defkeys-*       repeat speed
+            fdb     chgKeyS-*       change key repeat speed
+
+            fdb     defkeyc-*       key click
+            fdb     chgKeyC-*       change key start delay
+
+            fdb     defmsep-*       pointer side
+            fdb     chgMseP-*       change pointer side
+
+            fdb     defmser-*       pointer resolution
+            fdb     chgMseR-*       change pointer resolution
+
+            fdb     defmses-*       mouse sample rate
+            fdb     chgMseS-*       change pointer sameple rate
+
+            fdb     defmset-*       mouse timeout
+            fdb     chgMseT-*       change pointer button timeout
+
+            fdb     defmsec-*       mouse second button action
+            fdb     chgMSec-*       change key start delay
+
+            fdb     defmtyp-*       monitor type
+            fdb     chgMTyp-*       change monitor type
+
+            fdb     defspri-*       system priority
+            fdb     chgSPri-*       change system priority
+
+            fdb     defmcrc-*       system CRC calc.
+            fdb     chgMCrc-*       change monitor type
+
+            fdb     defdatd-*       default data directory
+            fdb     chgDatD-*       change data directory
+
+            fdb     defexed-*       default execution directory
+            fdb     chgExeD-*       change exec directory
+
+            fdb     defshel-*       default console shell
+            fdb     chgShel-*       change console shell
+
+            fdb     defshprm-*      default console shell parameters
+            fdb     chgShPrm-*      change default console shell parameters
+
+            fdb     defstrt-*       startup file
+            fdb     chgStrt-*       change startup file
+
+            fdb     defauto-*       AutoEx file
+            fdb     chgAuto-*       change AutoExec file
+
+            fdb     defautop-*      AutoEx parameter
+            fdb     chgAutoP-*      change AutoExec parameter
+
+            fdb     defmodld-*      load a module
+            fdb     chgModLd-*
+
+            fdb     defpal-*        Default Palettes
+            fdb     chgPal-*        change palette entry
+
+            fdb     dfVrb-*         Default verboses
+            fdb     chgVrbs-*
+
+            fdb     dfDVTyp-*       Default console device type
+            fdb     chgCTyp-*       change console device type
+
+            fdb     dfCXSiz-*       Default X size of console
+            fdb     chgCXSiz-*      change console X size
+
+            fdb     dfCYSiz-*       Default Y size of console
+            fdb     chgCYSiz-*      change console Y size
+
+            fdb     dfFClr-*
+            fdb     chgFClr-*
+
+            fdb     dfBClr-*
+            fdb     chgBClr-*
+
+            fdb     dfBdClr-*
+            fdb     chgBdClr-*
+
+            fdb     0               terminater
+            fdb     0
+
+* keyboard keywords
+defkeyd     fcc     /REPSTR=/       repeat start delay
+            fcb     0
+defkeys     fcc     /REPSPD=/       repeat speed
+            fcb     0
+defkeyc     fcc     /KEYCLK=/       keyboard click
+            fcb     0
+
+* mouse keywords
+defmsep     fcc     /PTRSID=/       pointer side
+            fcb     0
+defmser     fcc     /PTRRES=/       pointer resolution
+            fcb     0
+defmses     fcc     /PTRSAM=/       mouse sample rate
+            fcb     0
+defmset     fcc     /PTRTIM=/       mouse timeout
+            fcb     0
+defmsec     fcc     /MSECLR=/       mouse second button action
+            fcb     0
+
+defmtyp     fcc     /MONTYPE=/      monitor type
+            fcb     0
+defspri     fcc     /SYSPRI=/       system priority
+            fcb     0
+defmcrc     fcc     /SYSCRC=/       system CRC calulation
+            fcb     0
+
+defdatd     fcc     /DATA=/         system data path
+            fcb     0
+defexed     fcc     /EXEC=/         system exec path
+            fcb     0
+
+dfVrb       fcc     /CONVRBSE=/     console verbose text reponse
+            fcb     0
+dfDVTyp     fcc     /CONDVTYP=/     console device type
+            fcb     0
+dfCXSiz     fcc     /CONXSIZ=/
+            fcb     0
+dfCYSiz     fcc     /CONYSIZ=/
+            fcb     0
+dfFClr      fcc     /CONFCLR=/
+            fcb     0
+dfBClr      fcc     /CONBCLR=/
+            fcb     0
+dfBdClr     fcc     /CONBDCLR=/
+            fcb     0
+
+defshel     fcc     /CONSHELL=/     default console shell
+            fcb     0
+defshprm    fcc     /CONSHPRM=/     default console shell parameters
+            fcb     0
+defstrt     fcc     /CONSTRT=/      console shell parameter (startup -p)
+            fcb     0
+defauto     fcc     /CONAUTO=/      console autoexec file
+            fcb     0
+defautop    fcc     /CONAUTP=/      console autoexec parameters
+            fcb     0
+
+defmodld    fcc     /MODLOAD=/      load a module
+            fcb     0
+
+defpal      fcc     /PALET/         default palette
+            fcb     0
+
+            endsect

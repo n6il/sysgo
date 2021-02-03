@@ -1,0 +1,328 @@
+
+            psect   _util,0,0,0,0,0
+
+            ifp1
+            use     deffile
+            endc
+
+*
+* Set descriptor /Term to new settings from DP
+*
+* uses I$ModDsc to modify /Term device descriptor to
+* new window settings
+*
+* Entry: None.
+*
+SetMod:     pshs    d,x,y,u
+            tst     <gScrTyp        get screen type
+            bmi     sMd0200         not a window, skip out
+            leas    -modPkSz,s      make a buffer for I$ModDsc
+            leax    modPkt,pc       point to default packet
+            leay    ,s
+            ldb     #modPkSz        get size of move
+sMd0100     lda     ,x+             move packet to stack buffer for mods.
+            sta     ,y+
+            decb                    done?
+            bne     sMd0100         no, keep going
+* point to packet and change it to env.file data.
+            leau    ,s              point to packet
+            ldb     <gDefCType      get screen type
+            stb     1,u             save it in packet
+            ldb     <gDefCXSiz      get screen size
+            stb     7,u
+            ldb     <gDefCYSiz      get screen Y size
+            stb     9,u
+            ldb     <gDefFClr       get foreground
+            stb     11,u
+            ldb     <gDefBClr       get background color
+            stb     13,u
+            ldb     <gDefBdClr      get border color
+            stb     15,u
+            ldb     #8              8 bytes to change
+            leax    term+1,pc       point to device name (without slash)
+*           os9     I$ModDsc        set the descriptor to new settings
+            fcb     $10,$3f,$91
+            leas    modPkSz,s       purge I$ModDsc packet
+* now close all the paths and re-open them
+            clra                    get stdin
+            os9     I$Close
+            inca                    get stdout
+            os9     I$Close
+            inca                    get stderr
+            os9     I$Close
+            leax    term,pc         point to path of /Term
+            lda     #UPDAT.
+            os9     I$Open          open it for stdin
+            os9     I$Dup           duplicate it for stdout
+            os9     I$Dup           duplicate it for stderr
+           ifeq    Debug
+            lbsr    SetIO           copy I/O pointers to system process
+           endc
+            lbsr    DWEnd           do a DWEnd to switch window
+sMd0200     puls    d,x,y,u,pc
+
+* I$ModDsc change packet for /Term device (set to defaults)
+modPkt      fcb     IT.STY,defCTyp  screen type
+            fcb     IT.CPX,0        screen start X
+            fcb     IT.CPY,0        screen start Y
+            fcb     IT.COL,defCXSz  screen size X
+            fcb     IT.ROW,defCYSz  screen size Y
+            fcb     IT.FGC,defFClr  foreground color
+            fcb     IT.BGC,defBClr  background color
+            fcb     IT.BDC,defBdClr border color
+modPkSz     equ     *-modPkt
+
+term        fcs     "/Term"
+
+* Set I/O system paths to current window
+*
+SetIO:      pshs    d,y,u
+* Copy my default I/O ptrs to the system process
+            ldy     #gPrcDesc
+            ldu     <gSysBlk        save its's address
+            ldd     <D.SysPrc,u
+            leau    d,u
+            leau    <P$DIO,u
+            leay    <P$DIO,y
+            ldb     #DefIOSiz-1
+cpyIO       lda     b,y
+            sta     b,u
+            decb
+            bpl     cpyIO
+            puls    d,y,u,pc
+
+* Process 1 line from env.file
+*
+* blank lines and comment lines are aleady skipped
+* only pays attention to lines that are relative to me
+*
+* Entry: X = pointer to line from env.file
+*
+ProcCfg:
+            pshs    d,x,y,u         save everything
+            clr     CASEMTCH        make sure strncmp compares case
+            leau    cfgKeys,pc      point to text vector table
+            ldy     2,s             get X from stack
+pcfg0100    ldd     ,u              get offset to text
+            leax    d,u             offset X to text
+            lbsr    STRLEN          get length of keyword to look for
+            lbsr    STRNCMP         compare entry
+            beq     pcfg0120        got a match
+
+pcfg0110    leau    4,u             move to next entry
+            ldd     ,u              done vector table for this line?
+            bne     pcfg0100        no, return try next entry
+            clra                    clear carry (flags no match for me)
+            bra     pcfg0200        yes, return
+
+* we have a line with a keyword I recognize, process it
+pcfg0120
+            lbsr    STRLEN          get keyword length again
+            leay    d,y             bump line data past keyword
+            leau    2,u             bump vector pointer to sub offset
+            ldd     ,u              get vector to keyword subroutine
+            jsr     d,u             execute routine
+pcfg0200    puls    d,x,y,u,pc
+
+*
+* Set config information to system
+*
+SetCfg:     pshs    d,x,y,u         save registers used
+* System Priority
+            os9     F$ID
+            ldb     <gDefSPri       get system priority
+            os9     F$SPrior
+* Default CRC
+            lda     <gDefMCRC       get default CRC
+            os9     F$CRCMod
+
+* set mouse keyboard settings
+            lda     <gDefKeyD       get key start delay
+            ldb     <gDefKeyS       get key repeat speed
+            tfr     d,y
+            lda     <gDefMseR       get mouse res.
+            ldb     <gDefMseP       get mouse port
+            tfr     d,x
+            lda     #1
+            ldb     #SS.GIP
+            os9     I$SetStt
+            lda     #%10000000      get mask for mouse 2nd button change
+            ldb     <gDefMseC       get mouse clear click
+            beq     chkClick
+            ora     #%01000000      enable mouse 2nd as clear
+chkClick    ora     #%00100000      add key click change
+            ldb     <gDefKeyC       get key click
+            beq     setGIP2
+            ora     #%00010000      enable key click
+setGIP2     ldb     #SS.GIP2
+            tfr     d,x
+            ldy     #0
+            ldu     #0
+            lda     #1
+            os9     I$SetStt
+            lda     <gDefMseS       get mouse sample rate
+            ldb     <gDefMseT       get mouse timeout
+            tfr     d,x
+            lda     #1
+            ldb     #SS.Mouse       set mouse parameters
+            os9     I$SetStt
+* monitor setting
+            clra
+            ldb     <gDefMTyp       get monitor type
+            tfr     d,x
+            ldb     #SS.Montr
+            lda     #1
+            os9     I$SetStt
+* set default palettes
+            bsr     setDPal         set default palettes
+            puls    d,x,y,u,pc      return
+
+* set default palettes
+* Default palettes
+setDPal:    ldx     #gDefPal
+            ldb     #SS.DfPal
+            lda     #1
+            os9     I$SetStt
+            leas    -2,s
+            ldd     #$1b30
+            std     ,s
+            leax    ,s
+            ldy     #2
+            lda     #1
+            os9     I$Write
+            leas    2,s
+            rts
+
+*--------------------------------------------------------------------------
+* Check SDC presence
+*
+* Entry:
+*
+* Exit:
+*    CC = carry set on error
+*    B  = error code
+*
+chkSDC:     pshs    x,a
+            ldb     >$FF7F      get current slot info
+            pshs    b           save it
+            andb    #%00110000  keep only CTS
+            orb     #$03        start at slot 4
+chkSlot     stb     >$ff7f      activate slot being scanned
+            ldx     #$ff48
+            lda     #$64        test pattern
+            sta     -6,x        store at Flash Data Reg address
+            lda     -5,x        get value from Flash Ctrl Reg
+            clr     -6,x        clear Flash Data Reg
+            eora    -5,x        get changed bits from Ctrl Reg
+            suba    #$60        did expected bits change?
+            beq     hvSDC       branch if found SDC
+            decb
+            bge     chkSlot
+            puls    b           restore slot
+            stb     >$FF7F
+            puls    a,x         restore regs
+            comb                set carry (No SDC)
+            rts
+* found SDC
+hvSDC       lda     #'C         SDC magic command
+            sta     >$ff40      save it to SDC
+            ldx     #0
+hvSd0100    lda     >$ff48      get SDC status
+            lsra
+            bcc     hvSd0200    we're good exit
+            leax    -1,x
+            bne     hvSd0100
+            lda     #0          shut down SDC drive
+            sta     >$ff40
+            puls    b           restore MPI setup
+            stb     >$FF7F
+            comb                set carry (timeout)
+            puls    a,x,pc
+hvSd0200    puls    b           restore MPI slot
+            stb     >$FF7F
+            clra                clear carry
+            puls    a,x,pc
+
+* setup standard default config settings
+*
+* these all can be changed in the config file
+InitDflt:
+            pshs    d,x,y           save regs used
+            ldb     #defKStrt       get system default key repeat start
+            stb     <gDefKeyD
+            ldb     #defKSpd        get system default key speed
+            stb     <gDefKeyS
+            ldb     #defKClik       get system default key click
+            stb     <gDefKeyC
+            ldb     #defMPrt        get system default mouse port
+            stb     <gDefMseP
+            ldb     #defMRes        get system default mouse resolution
+            stb     <gDefMseR
+            ldb     #defMSam        get system default mouse sample rate
+            stb     <gDefMseS
+            ldb     #defMTim        get system default mouse timeout
+            stb     <gDefMseT
+            ldb     #defMBut2       get system default mouse button 2 click
+            stb     <gDefMseC
+            ldb     #defMTyp        get system default monitor type
+            stb     <gDefMTyp
+            ldb     #DefPrior       get system default system priority
+            stb     <gDefSPri
+            ldb     #DefCRC         get system default CRC checking (on)
+            stb     <gDefMCRC
+
+            ldb     #defVbMde       default to verbose
+            stb     <gDefVerb       verbose or not
+
+            ldb     #defCTyp        set 40xY text type (Y=1-60)
+            stb     <gDefCType      save default console shell window type
+            lda     #defCXSz
+            ldb     #defCYSz
+            sta     <gDefCXSiz      save X size
+            stb     <gDefCYSiz      save Y size
+            lda     #defFClr
+            ldb     #defBClr
+            sta     <gDefFClr       save foreground/backgroud color
+            stb     <gDefBClr
+            lda     #defBdClr       save border color
+            sta     <gDefBdClr
+
+            ldx     #gDefPal        point to palette buffer
+            lda     #1
+            ldb     #SS.DfPal
+            os9     I$GetStt        get default palette drom CoWin/CoGrf
+
+            leax    defDatDir,pc    set default data directory
+            ldy     #gDefDir
+            lbsr    STRCPY
+            leax    defHDDir,pc     set default execution
+            ldy     #gDefExe
+            lbsr    STRCPY
+
+            leax    Shell,pc        set default shell program
+            ldy     #gDefShell
+            lbsr    STRCPY
+            leax    ShellPrm,pc     set default parameters
+            ldy     #gShelPrm
+            lbsr    STRCPY
+            ldd     #ShellPL        get default parameter length
+            std     gShelPL
+            leax    Startup,pc      get default startup file
+            ldy     #gDefStrtup
+            lbsr    STRCPY
+            ldd     #StartupL
+            std     gStartLen
+
+            leax    AutoEx,pc       set default AutoEx program
+            ldy     #gDefAutoEx
+            lbsr    STRCPY
+            leax    AutoExPrm,pc    set default parameters
+            ldy     #gAutoPrm
+            lbsr    STRCPY
+            ldd     #AutoPL         get default parameter length
+            std     gAutoPrmL
+
+            puls    d,x,y,pc
+
+
+            endsect

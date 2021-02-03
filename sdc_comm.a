@@ -1,0 +1,286 @@
+
+            psect   _sdc_comm,0,0,0,0,0
+
+* SDC SD card definitions
+
+* HW Address
+sdCLtch:    equ     $FF40       controller latch (write)
+sdComand:   equ     $FF48       command register (write)
+sdStatus:   equ     $FF48       status register (read)
+sdPReg1:    equ     $FF49       param register 1
+sdPReg2:    equ     $FF4A
+sdPReg3:    equ     $FF4B
+sdDRegA:    equ     sdPReg2     first data register
+sdDRegB:    equ     sdPReg3     second data register
+
+* SD Status register
+sdBusy:     equ     %00000001   set while command is executing
+sdReady:    equ     %00000010   set when ready for data xfer
+sdFailed:   equ     %10000000   set on command failure
+
+sdCmdMde:   equ     $43         control latch value to enable command mode
+sdCmdRd:    equ     $80         read logical sector
+sdCmdWrt:   equ     $A0         write logical sector
+sdCmdEx:    equ     $C0         extended command
+sdCmdExD:   equ     $E0         extended command with data
+
+*--------------------------------------------------------------------------
+* Check SDC presence
+*
+* Entry:
+*
+* Exit:
+*    CC = carry set on error
+*    B  = error code
+*
+chkSDC:
+            pshs    cc          preserve IRQ's
+            orcc    #IntMasks   shut down IRQ's
+            ldd     #$8080      prepare not found values
+            pshs    dp,a,b      alloc variables on stack
+            ldx     #sdComand   point X to FDC command reg
+            ldb     >$ff7f      get current slot setup
+            andb    #$33        mask out unused bits
+            stb     2,s         save on stack (in DP position)
+            orb     #$03        start at slot 4
+
+chkSlot     stb     >$ff7f      activate slot being scanned
+            lda     ,s          have we found SDC?
+            bpl     chkFDC
+            lda     #$64        test pattern
+            sta     -6,x        store at Flash Data Reg address
+            lda     -5,x        get value from Flash Ctrl Reg
+            clr     -6,x        clear Flash Data Reg
+            eora    -5,x        get changed bits from Ctrl Reg
+            suba    #$60        did expected bits change?
+            bne     chkFDC      branch if not a SDC
+            stb     ,s          record SDC slot
+            bra     nxtSlot     scan next
+
+chkFDC      lda     1,s         have we already found FDC?
+            bpl     nxtSlot     branch if yes
+            bsr     fdcTest     test for FDC
+            bne     nxtSlot
+            stb     1,s         record FDC slot
+
+nxtSlot     decb                decrement SCS slot number
+            bitb    #$08        have we scanned all slots?
+            beq     chkSlot     loop if more to scan
+            lda     ,s          get slot with CoCo SDC
+            bmi     saveSDC     branch if none
+            cmpa    2,s         same as original slot selection?
+            bne     saveSDC     branch if no
+            eora    #$01        change original slot to..
+            sta     2,s         ..be something else
+            eora    #$01        back to the true SDC slot
+saveSDC     anda    #$83        keep SDC slot number or "not found"
+            sta     <gSdcSlot   save SDC slot info
+            lda     #$50
+            ldb     1,s         was FDC found?
+            bpl     useSlot     branch if yes
+            clra                irq masks not needed
+            ldb     2,s         get original MPI setting
+useSlot     stb     >$ff7f      activate default MPI slot
+            sta     <gIRQMask
+            lda     >$ff22      reset any latched IRQ's
+            leas    3,s
+            puls    cc          restore save IRQ's
+
+* disable floppy emulation capability in SDC controller
+            lda     #$c0        primary command code
+            ldb     #'g         secondary command to "Set Global Flags"
+            ldx     #$ff80      mask/flag bytes
+            ldy     #gMemPtr    point Y to data
+            ldu     #$ffff      "no buffer address"
+*           lbsr    CommSDC     send command
+            clrb                no error
+            rts                 return
+* test for presence of FDC in active slot
+fdcTest     lda     #$D0        FORCE INTERRUPT command
+            sta     ,x          send to FDC command register
+            bsr     fdcDelay    wait a while
+            lda     ,x          get FDC status
+            lda     3,x         read FDC data register
+            coma
+            sta     3,x         put inverted bytes back
+            bsr     fdcDelay    wait a while
+            suba    3,x         match above write?
+fdcDelay    pshs    cc,d,x,y
+            mul
+            puls    cc,d,x,y,pc restore regs and return
+
+*--------------------------------------------------------------------------
+* CommSDC
+*
+*    This is the core routine used for all
+*    transactions with the SDC controller.
+*
+* Entry:
+*    A = Command code
+*    B = LSN hi byte  / First parameter byte
+*    X = LSN lo word  / 2nd and third param bytes
+*    U = Address of I/O buffer ($FFFF = none)
+*
+* Exit:
+*    Carry set on error
+*    B = controller status code
+*    Y = address of SDC Data Register A (FF4A)
+*
+CommSDC:
+* Save current MPI setting and activate the SDC slot
+            pshs    cc          preserve CC (interrupt masks)
+            lsr     ,s          shift carry out of saved CC
+            pshs    d           save cmd code, alloc byte for saveing MPI
+            tfr     cc,a        get copy of current CC
+            ora     <gIRQMask   set I and F masks if FDC present
+            tfr     a,cc        update I and F in CC
+            clr     >$ffd9      drop to low speed (1.89mhz)
+            lda     >$ff7f      get current slot
+            sta     1,s         save where B was
+            anda    #$30        mask out SCS
+            ora     <gSdcSlot
+            ldy     #sdDRegA    setup Y for hardware addressing
+            tsta                was a SDC controller found?
+            bmi     sdcNone     exit if no
+            sta     >$ff7f      set new slot
+
+* Put controller in Command mode
+            lda     #sdCmdMde   the magic number
+            sta     -10,y       send to control latch (FF40)
+            puls    a           pull saved command code in A
+
+* Put input parameters into the registers.
+* It does no harm to put random data in the
+* registers for commands which dont use them.
+            stb     -1,y        high byte to param reg 1
+            stx     ,y          low word to param regs 2 and 3
+
+* Wait for Not Busy.
+            lbsr    waitForIt   run polling loop
+            bcs     cmdExit     exit if error or timed out
+* Send command to controller
+            sta     -2,y        to command register (FF48)
+* Determine if a data block should be sent.
+* The code for any command which requires
+            bita    #$20        test the "send block" command bit
+            beq     rxBlock     branch if no block to send
+* Wait for Ready to send
+            lbsr    waitForIt   run polling loop
+            bcs     cmdExit     exit if error or timed out
+            leax    ,u          move data address to X
+*           bita    #$40        extended command or sector write?
+*           lbne    txCmd       branch if extended command
+
+* Send 256 bytes of data
+            ldd     #32*256+8   32 chunks of 8 bytes
+txChunk     ldu     ,x          send one chunk...
+            stu     ,y
+            ldu     2,x
+            stu     ,y
+            ldu     4,x
+            stu     ,y
+            ldu     6,x
+            stu     ,y
+            abx                 point X at next chunk
+            deca                decrement chunk counter
+            bne     txChunk     loop until all 256 bytes sent
+
+* Wait for command to complete
+txCompl     lda     #5          timeout retries
+txWait      bsr     waitForIt   run polling loop
+            bitb    #sdBusy     test BUSY bit
+            beq     cmdExit     exit if completed
+            deca                decrement retry counter
+            bne     txWait      repeat if until 0
+            coma                set carry for timeout error
+            bra     cmdExit     exit
+
+* set error condition and exit when no SDC hardware found
+sdcNone     leas    1,s         pop saved command code
+            comb                set carry
+            ldb     #E$Unit     error number for missing hardware
+            bra     cmdExit
+
+* For commands which return a 256 byte response block the
+* controller will set the READY bit in the Status register
+* when it has the data ready for transfer.   For commands
+* which do not return a response block the BUSY bit will
+* be cleared to indicate that the command has completed.
+*
+rxBlock
+            bsr     longWait    run long status polling loop
+            bls     cmdExit     exit if error, time out or complet
+            leax    1,u         test the provided buffer address
+            beq     cmdExit     exit if "no buffer" ($FFFF)
+            leax    ,u          move data address to X
+*           bita    #$40        extended command or sector read?
+*           bne     rxCmd       branch if extended command
+
+* 6809 read transfer loop into current task space
+            ldd     #32*256+8   32 chunks of 8 bytes
+rxChunk     ldu     ,y          read one chunk...
+            stu     ,x
+            ldu     ,y
+            stu     2,x
+            ldu     ,y
+            stu     4,x
+            ldu     ,y
+            stu     6,x
+            abx                 update X for next chunk
+            deca                decrement chunk counter
+            bne     rxChunk     loop until all 256 bytes transferr
+            bra     cmdOK       exit with sucess
+
+rx6309      ldw     #256
+            orcc    #$50
+            leax    1,y
+            tfm     x,u+
+cmdOK       clrb
+
+* Exit
+cmdExit
+            puls    a
+            rol     ,s          rotate carry into saved CC on stac
+            clr     -10,y       end command mode
+            sta     >$ff7f      restore saved MPI settings
+            clr     >$ffd9      drop to low speed (1.89mhz)
+            lda     #$5a
+            sta     >$ffd9
+            puls    cc,pc       restore irq masks, update carry an
+
+*--------------------------------------------------------------------------
+* Wait for controller status to indicate either "Not Busy" or "Ready".
+* Will time out if neither condition satisfied within a suitable period.
+*
+* Exit:
+*    CC.C set on error or time out.
+*    CC.Z set on "Not Busy" status (if carry cleared).
+*    B = status
+*    A, Y and U are preserved.
+*
+longWait    bsr     waitForIt   enter here for doubled timeout
+            bcc     waitRet     return if cleared in 1st pass
+waitForIt   ldx     #0          setup timeout counter
+waitLp      comb                set carry for assumed FAIL
+            ldb     -2,y        read status
+            bmi     waitRet     return if FAILED
+            lsrb                BUSY --> Carry
+            bcc     waitDone    branch if not busy
+            bitb    #sdReady/2  test READY (shifted)
+            bne     waitRdy     branch if ready for transfer
+            bsr     waitRet     consume some time
+            ldb     #$81        status = timeout
+            leax    ,-x         decrement timeout counter
+            beq     waitRet     return if timed out
+            bra     waitLp      try again
+
+waitDone    clrb                Not Busy: status = 0, set Z
+waitRdy     rolb                On Ready: clear C and Z
+waitRet     rts                 return
+
+rxCmd
+txCmd
+            bra     cmdOK       exit with sucess
+
+
+        endsect

@@ -1,0 +1,585 @@
+
+            psect       _screen,0,0,0,0,0
+
+           ifp1
+            use     deffile
+           endc
+
+* Show main banner
+ShowBanr:   leay    Banr4080,pc     point to 40/80 column text
+            ldb     <gScrXSiz+1     get X size
+            cmpb    #40             40 or 80 column?
+            bge     doBan010        80, skip ahead
+* un-comment next line to allow 32 column banner
+            leay    Banr32,pc       point to 32 column routine
+doBan010    jsr     ,y              do appropriate banner routine
+
+* show memory size
+            leax    txtMSize,pc     show memory size text
+            ldb     <gDefFClr
+            lbsr    FColor
+            ldb     <gDefBClr
+            lbsr    BColor
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+            leax    txtM2048k,pc    default text to 2mb
+            ldd     D.BlkMap+2,u    get memory size from DP
+            cmpd    #$0300
+            beq     prtMem          2mb skip to print
+            leax    txtM128k,pc
+            cmpd    #$0210          128k?
+            beq     prtMem
+            leax    txtM256k,pc
+            cmpd    #$0220          256k?
+            beq     prtMem
+            leax    txtM512k,pc
+            cmpd    #$0240          512k?
+            beq     prtMem
+            leax    txtM1024k,pc
+            cmpd    #$0280          1024k?
+            beq     prtMem
+            leax    txtMUnk,pc      point to unknown
+prtMem      lbsr    Print
+            ldb     <gDefFClr
+            lbsr    FColor
+* show CPU type
+            leax    txtCPU,pc
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+            ldd     #$ffff
+            leax    txtCPU68,pc
+            fdb     $104f           CLRD on 6309
+            tstb                    is this 6309?
+            bne     cpuprint
+            leax    txtCPU63,pc
+            lbsr    Print
+* This code is executed only if we have a 6309
+* Determine if we are in native mode or not
+            pshs    cc,dp,x,y,u     save all registers but D
+            fdb     $1038           (PSHSW)
+            leay    <native,pc      native mode PC
+            leax    <emulate,pc     emulation mode PC
+            pshs    x,y             save them
+            pshs    cc,d,dp,x,y,u   and the rest of the registers, too.
+            orcc    #Entire         set the entire bit in CC
+            rti
+emulate     leas    2,s             emulation mode: kill native mode PC
+            clrb                    we're in emulation mode
+            fcb     $8C             skip 2 bytes
+native      ldb     #1              in native mode
+            puls    u               restore W
+            fdb     $1F36           (TFR U,W)
+            puls    cc,dp,x,y,u     restore all of our other registers
+emumsg      leax    txt6368,pc      default to 6809
+            tstb                    are we in native mode?
+            beq     cpuprint        no
+            leax    txt6363,pc      get the 6309 message
+cpuprint    lbsr    Print
+            ldb     <gDefFClr
+            lbsr    FColor
+* show if Drivewire present
+            leax    txtDrvWire,pc
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+* DWIO in memory?
+            leax    txtDWIO,pc      point to dwio module name
+            lda     #Sbrtn+Objct
+            os9     F$NMLink        does it exist in memory?
+            bcc     dw0100          yes, skip ahead
+            leax    txtDwNo,pc
+            lbra    dw0300
+* DWIO detected check server activity
+dw0100      leax    txtDwYes,pc
+            lbsr    Print
+
+dw0105      ldu     <gSysBlk        get system blk 0 pointer
+            leax    txtDwSrv,pc
+            ldd     <$0c,u          has DWIO been init'd?
+            bne     dw0200          yes, skip ahead
+* DWIO present, but not initialized, let's try to
+* get it going. (checks for server)
+            leax    txtDwNSrv,pc
+            lbsr    Print
+
+            ldx     #gTxtBuff       point to a general buffer
+            leay    txtDwX0,pc      point to a driverwire drivename
+            ldd     ,y++            save it to buffer
+            std     ,x
+            lda     ,y+
+            clrb
+            std     2,x
+dw0110      lda     #READ.          try for read mode
+            ldx     #gTxtBuff       point to pathname
+            os9     I$Attach        try to init it
+            bcc     dw0130          no error, skip out (got initialized)
+            cmpb    #E$MNF          module not found?
+            beq     dw0120          yes, try next module
+
+dw0120      ldx     #gTxtBuff
+            inc     2,x
+            ldb     2,x
+            cmpb    #'3             at max?
+            bls     dw0110          no, try next drive
+            leax    txtDwChk,pc
+            lbsr    Print
+            lbsr    GETC
+            bra     dw0310
+dw0130      leax    txtBKSpc,pc     point to backspace string
+            ldy     #22
+            lda     #1
+            os9     I$Write
+            ldb     #$04
+            lbsr    PUTC
+            bra     dw0105          go check again
+
+* DWIO in memory check if it's been initialized
+* this determines if the server is running.
+dw0200      lbsr    Print
+            ldb     <$10,u          get server ID
+            ldx     #gTxtBuff       point to text buffer
+            cmpb    #$ff            pyDrivewire?
+            bne     dw0210          no, check Java version
+            ldb     #'P
+            stb     ,x
+            ldb     #'Y
+            stb     1,x
+            ldd     #$0d0a
+            std     2,x
+            clr     4,x
+            bra     dw0300
+dw0210      addb    #$30            make version printable
+            stb     ,x
+            ldd     #$0d0a
+            std     1,x
+            clr     3,x
+dw0300      lbsr    Print
+dw0310      ldb     <gDefFClr
+            lbsr    FColor
+
+* show if CocoSDC present
+            leax    txtCCSdc,pc
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+            leax    txtGotSDC,pc    point to no SDC present
+            lbsr    chkSDC
+            bcc     prnSDC
+            leax    txtNoSDC,pc     point to have SDC
+prnSDC      lbsr    Print
+            ldb     <gDefFClr
+            lbsr    FColor
+
+* show Gime-X if present
+            leax    txtGimeX,pc
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+            clr     <gGimeX         Zero out our DMA test byte
+            ldx     #gPrcDesc       Point to buffer for our descriptor
+            clra
+            ldb     P$DATImg+1,x    Get first MMU block for our process
+            lslb                    *32 to get physical address
+            rola
+            lslb
+            rola
+            lslb
+            rola
+            lslb
+            rola
+            lslb
+            rola
+            std     >$ffe1          Save to upper 16 bits of DMA address
+            clr     >$ffe3          Clear out lower 8 bits of DMA address
+            lda     #$FF            Flag byte that DMA will write if present
+            sta     >$ffe8          Send to DMA (will copy to DMAByte)
+            ldb     <gGimeX         get Gime-X flag
+            bne     XFndMsg         found it
+            leax    txtNGimeX,pc    Point to GIME-X is not present message
+            lbsr    Print
+            bra     shw0810
+XFndMsg     leax    txtFGimeX,pc
+            lbsr    Print
+            lda     >$ffef          Get GIME-X version number
+            pshs    a               Save copy
+            ldx     #gTxtBuff+5     Point to text buffer
+            lsra                    Shift out SDR/DDR flag
+            bcc     SDR
+            ldb     #'D
+            fcb     $8C             2 byte skip (CMPX opcode)
+SDR         ldb     #'S
+            stb     ,x+
+            ldy     #'D*256+'R
+            sty     ,x++
+            ldb     #C$CR
+            stb     ,x+
+            ldb     #C$LF
+            stb     ,x+
+            clr     ,x              terminate string
+            lda     ,s              Get GIME-X version number again
+            anda    #%00111111      Keep minor version bits only (0-63)
+            ldx     #gTxtBuff+2     Where to put in output string
+            bsr     NumOut          Append digits
+            puls    a               Get version number back
+            lsra                    Shift major version # to least sig 2 bits
+            lsra
+            lsra
+            lsra
+            lsra
+            lsra
+            adda    #$30            ASCII-fy it (0-3)
+            ldb     #'.
+            ldx     #gTxtBuff       Point to major version part of string
+            std     ,x              Add major version # and '.'
+            ldx     #gTxtBuff       Point to entire version string
+            lbsr    Print
+shw0810     ldb     <gDefFClr
+            lbsr    FColor
+shw0900     rts
+
+* Entry: A=version # (0-63) in least sig 6 bits
+*        X=Ptr to where to put digits
+NumOut      ldb   #'0               Default 10's digit to ASCII 0 (minus 1)
+Sub10s      incb                    Bump up 10's ASCII digit
+            suba  #10               Subtract 10 from version
+            bcc   Sub10s            Keep going until we wrap negative
+            decb                    Adjust 10's back down
+            adda  #10+'0            add 10 back since we wrapped, and ASCII-f
+            exg   a,b               Swap so 10's first, then 1's digit
+            std   ,x
+            ldb   #C$SPAC           And add space
+            stb   2,x
+            rts
+
+*
+* Print main Banner
+*
+
+* 32 column screen
+Banr32:
+            lbsr    Cls             clear screen
+* print header line 1
+            leax    txtHdr1,pc
+            lbsr    Print           print it
+            lbsr    PUTCR
+            lbsr    PutLF
+* print header line 2
+            leax    txtHdr2,pc
+            lbsr    Print           print it
+            lbsr    PUTCR
+            lbsr    PutLF
+* print header line 3
+            leax    txtHdr3,pc
+            lbsr    Print           print it
+            lbsr    PUTCR
+            lbsr    PutLF
+* print header line 4
+            leax    txtHdr4,pc
+            lbsr    Print           print it
+            lbsr    PUTCR
+            lbsr    PutLF
+            rts
+
+*
+* 40/80 column screen
+*
+Banr4080:
+            ldb     <gDefFClr
+            lbsr    FColor
+            ldb     <gDefBClr
+            lbsr    BColor
+            lbsr    Cls             clear screen
+* CWarea based on current screen size
+            ldd     gScrXSiz        get X size
+            tfr     b,a             move X size to A
+            ldb     #8              get Y size
+            tfr     d,y
+            ldx     #0
+            lbsr    CWArea          change working area
+* set background color for frame
+            ldb     #Red.           set new colors
+            lbsr    BColor
+            ldb     #Yellow.
+            lbsr    FColor
+            lbsr    Cls
+* CWArea shifted 1 char to draw a frame quickly
+            ldx     #$0101
+            ldd     gScrXSiz        get X size
+            subb    #2              subtract 2
+            tfr     b,a             move X size to A
+            ldb     #6              get Y size
+            tfr     d,y
+            lbsr    CWArea          set new work area
+            ldb     #Black.
+            lbsr    BColor
+            lbsr    Cls
+* print header line 1
+            leax    txtHdr1,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     #0              1st line
+            lbsr    CurXY
+            leax    txtHdr1,pc
+            lbsr    Print           print it
+* print header line 2
+            leax    txtHdr2,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     #1              4th line
+            lbsr    CurXY
+            ldb     #Green.
+            lbsr    FColor
+            leax    txtHdr2,pc
+            lbsr    Print           print it
+* print header line 3
+            ldb     #White.
+            lbsr    FColor
+            leax    txtHdr3,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     #2              6th line
+            lbsr    CurXY
+            leax    txtHdr3,pc
+            lbsr    Print           print it
+* print header line 4
+            leax    txtHdr4,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     #3              6th line
+            lbsr    CurXY
+            leax    txtHdr4,pc
+            lbsr    Print           print it
+* print header line 5
+            leax    txtHdr5,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     #4              6th line
+            lbsr    CurXY
+            leax    txtHdr5,pc
+            lbsr    Print           print it
+* print header line 6
+            leax    txtHdr6,pc
+            lbsr    STRLEN          get length
+            lsra                    divide by 2
+            rorb
+            pshs    d
+            ldd     gScrXSiz        get X size
+            lsra                    divide by 2
+            rorb
+            subd    #1              take 1 more for CW Size
+            subd    ,s++            subtract from middle
+            tfr     b,a
+            ldb     <gDefCType      get screen type
+            cmpb    #1              40 col?
+            bne     hdr6
+            deca                    take 1 more off X
+hdr6        ldb     #5              6th line
+            lbsr    CurXY
+            leax    txtHdr6,pc
+            lbsr    Print           print it
+
+            ldb     <gDefBClr
+            lbsr    BColor
+            ldb     <gDefFClr
+            lbsr    FColor
+            ldx     #0
+            lda     gScrXSiz+1
+            ldb     gScrYSiz+1
+            tfr     d,y
+            lbsr    CWArea
+            ldd     #$0008
+            lbsr    CurXY
+
+            rts
+
+* Print a null terminated string
+*
+* Entry: X = Pointer to string
+Print:      pshs    a,x,y
+            lbsr    STRLEN          get length
+            tfr     d,y             move it to Y
+            lda     #1
+            os9     I$Write
+            puls    a,x,y,pc
+
+* Print a null terminated string based on Verbose setting
+*
+* Entry: X = Pointer to string
+PrintVrb:   pshs    a,x,y
+            tst     <gDefVerb       verbose mode?
+            beq     prntNo
+            lbsr    STRLEN          get length
+            tfr     d,y             move it to Y
+            lda     #1
+            os9     I$Write
+prntNo      puls    a,x,y,pc
+
+*
+Cls:        pshs    a,x,y
+            leas    -1,s
+            lda     #$0c
+            sta     ,s
+            leax    ,s
+            ldy     #1
+            lda     #1
+            os9     I$Write
+            leas    1,s
+            puls    a,x,y,pc
+
+* change working area
+*
+* Entry: X= Window start MSB=X, LSB=Y
+*        Y= Size MSB=X, LSB=Y
+CWArea:     pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     cwNoWin
+            leas    -6,s            make a buffer
+            ldd     #$1b25          do CWArea
+            std     ,s
+            stx     2,s
+            sty     4,s
+            leax    ,s
+            ldy     #6
+            lda     #1
+            os9     I$Write
+            leas    6,s             purge buffer
+cwNoWin     puls    d,x,y,pc
+
+* Set foreground color
+FColor:     pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     fcNoWin         no
+            leas    -3,s            make a buffer
+            stb     2,s
+            ldd     #$1b32          FColor
+            std     ,s
+            leax    ,s
+            ldy     #3
+            lda     #1
+            os9     I$Write
+            leas    3,s             purge buffer
+fcNoWin     puls    d,x,y,pc
+
+* Set palette register
+*
+* Entry: A = palette #
+*        B = Color #
+*
+SetPal:     pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     spNoWin         no
+            leas    -4,s
+            sta     2,s
+            stb     3,s
+            ldd     #$1b31
+            std     ,s
+            leax    ,s
+            ldy     #4
+            lda     #1
+            os9     I$Write
+            leas    4,s
+spNoWin     puls    d,x,y,pc
+
+* Print a linefeed
+PutLF:      pshs    d
+            ldd     #$010a
+            lbsr    FPUTC
+            puls    d,pc
+
+* Set background color
+BColor:     pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     bcNoWin         no
+            leas    -3,s
+            stb     2,s
+            ldd     #$1b33
+            std     ,s
+            leax    ,s
+            ldy     #3
+            lda     #1
+            os9     I$Write
+            leas    3,s
+bcNoWin     puls    d,x,y,pc
+
+* Set background color
+DWEnd:      pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     dsNoWin         no
+            leas    -2,s
+            ldd     #$1b24
+            std     ,s
+            leax    ,s
+            ldy     #2
+            lda     #1
+            os9     I$Write
+            leas    2,s
+dsNoWin     puls    d,x,y,pc
+
+* Set cursor
+CurXY:      pshs    d,x,y
+            tst     <gScrTyp        do we have a window?
+            bmi     cxyNoWin        no
+            leas    -3,s
+            addd    #$2020
+            std     1,s
+            ldb     #$02
+            stb     ,s
+            leax    ,s
+            ldy     #3
+            lda     #1
+            os9     I$Write
+            leas    3,s
+cxyNoWin    puls    d,x,y,pc
+
+
+
+
+
+
+
+
+
+
+            endsect

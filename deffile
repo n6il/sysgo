@@ -1,0 +1,34 @@
+
+Level    set     2
+MATCHBOX set     0
+CoGrf    set     0
+H6309    set     0
+GIMEX    set     0
+
+* Sysgo specific defaults
+Debug           equ     0           debug mode
+
+defVbMde        equ     0           verbose mode (0=Sysgo banner, 1=verbose)
+defPseTim       equ     10          pause ticks for error messages
+* keyboard system defaults
+defKStrt        equ     32          default keyboard repeat start delay
+defKSpd         equ     5           default keyboard repeat speed
+defKClik        equ     1           default keyboard key click
+* mouse system defaults
+defMPrt         equ     1           default mouse port
+defMRes         equ     0           default mouse resolution
+defMSam         equ     3           default mouse sample rate
+defMTim         equ     1           default mouse button timeout
+defMBut2        equ     0           default mouse button 2 action
+* default console settings
+defMTyp         equ     0           default console monitor type
+defCTyp         equ     1           40xY text window for console.
+defCXSz         equ     40          default console window X size
+defCYSz         equ     25          default console window Y size
+defFClr         equ     Cyan.       default console foreground color
+defBClr         equ     Black.      default console background color
+defBdClr        equ     Black.      default border color
+* default system task settings
+DefPrior        equ     128         default system priority
+DefCRC          equ     2           default CRC checking
+

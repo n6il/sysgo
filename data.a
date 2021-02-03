@@ -1,0 +1,74 @@
+*
+* Global Data
+*
+
+                psect   _data,0,0,0,0,0
+
+* default CoWin palette codes for colors.
+                csect
+White.:         rmb     1
+Blue.:          rmb     1
+Black.:         rmb     1
+Green.:         rmb     1
+Red.:           rmb     1
+Yellow.:        rmb     1
+Magenta.:       rmb     1
+Cyan.:          rmb     1
+                endsect
+
+                vsect   dp
+gGimeX:         rmb     1       Gime-X check byte
+gMemPtr:        rmb     2       data area pointer
+gSysBlk:        rmb     2       address of system block 0
+gScrTyp:        rmb     1       screen type
+gScrXSiz:       rmb     2       screen X size
+gScrYSiz:       rmb     2       Screen Y size
+gSdcSlot:       rmb     1       SDC slot #
+gIRQMask:       rmb     1       SDC IRQMask
+gCfgPth:        rmb     1       config file path
+gMpiSlt1:       rmb     1
+gMpiSlt2:       rmb     1
+
+* system/user defined defaults
+gDefKeyD:       rmb     1       key delay
+gDefKeyS:       rmb     1       key speed
+gDefKeyC:       rmb     1       key click
+gDefMseP:       rmb     1       mouse port
+gDefMseR:       rmb     1       mouse resolution
+gDefMseS:       rmb     1       mouse sample rate
+gDefMseT:       rmb     1       mouse timeout
+gDefMseC:       rmb     1       mouse button 2 action
+gDefMTyp:       rmb     1       monitor type
+gDefSPri:       rmb     1       system priority
+gDefMCRC:       rmb     1       module CRC checking
+gDefVerb:       rmb     1       sysgo verbose text or not
+gDefCType:      rmb     1       console device type
+gDefCXSiz:      rmb     1       console default X size
+gDefCYSiz:      rmb     1       console default Y size
+gDefFClr:       rmb     1       default foregornd color
+gDefBClr:       rmb     1       default backgroud color
+gDefBdClr:      rmb     1       default border color
+gDefPal:        rmb     16      default palette
+
+                endsect
+
+                vsect
+gDefDir:        rmb     256     default data directory
+gDefExe:        rmb     256     default exec. directory
+gDefShell:      rmb     32      default shell program
+gShelPrm:       rmb     128     default shell parameters
+gShelPL:        rmb     2       default shell parameter length
+gDefStrtup:     rmb     128     default startup file
+gStartLen:      rmb     2       default startup file length
+gDefAutoEx:     rmb     32      default AutoEx program
+gAutoPrm:       rmb     128     default AutoEx parameters
+gAutoPrmL:      rmb     2       default AtoEx parameter length
+
+* general buffers
+gTxtBuff:       rmb     128     general text buffer
+gCfgBuff:       rmb     256     config file input buffer
+gErrBuff:       rmb     256     string buffer for error print
+gPrcDesc:       rmb     512
+                endsect
+
+                endsect
