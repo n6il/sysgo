@@ -134,6 +134,14 @@ txtNGimeX:  fcc     /Not found./
 txtFGimeX:  fcc     /Detected. Ver. /
             fcb     0
 
+txtCc3Fpga: fcc     /CoCo3FPGA - /
+            fcb     0
+txtN3Fpga:  fcc     /Not detected./
+            fcb     C$CR,C$LF
+            fcb     0
+txtF3Fpga:  fcc     /Detected. Ver. /
+            fcb     0
+
 txtDExe:
             fcb     C$CR,C$LF
             fcc     /Setting default execution directory.../
@@ -355,6 +363,9 @@ cfgKeys:
             fdb     dfBdClr-*
             fdb     chgBdClr-*
 
+            fdb     dcc3fpga-*
+            fdb     cCc3Fpga-*
+
             fdb     0               terminater
             fdb     0
 
@@ -420,6 +431,9 @@ defmodld    fcc     /MODLOAD=/      load a module
             fcb     0
 
 defpal      fcc     /PALET/         default palette
+            fcb     0
+
+dcc3fpga    fcc     /COCO3FPGA=/     Coco3Fpga
             fcb     0
 
             endsect

@@ -286,6 +286,8 @@ InitDflt:
             stb     <gDefBClr
             lda     #defBdClr       save border color
             sta     <gDefBdClr
+            lda     #def3Fpga       default for CoCo3FPGA Flag
+            sta     <gCc3Fpga
 
             ldx     #gDefPal        point to palette buffer
             lda     #1

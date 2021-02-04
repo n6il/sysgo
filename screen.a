@@ -160,14 +160,17 @@ dw0310      ldb     <gDefFClr
             lbsr    FColor
 
 * show if CocoSDC present
+
             leax    txtCCSdc,pc
             lbsr    Print
             ldb     #Green.
             lbsr    FColor
+            tst     <gCc3Fpga       Check CoCo3Fpga
+            bne     noSDC
             leax    txtGotSDC,pc    point to no SDC present
             lbsr    chkSDC
             bcc     prnSDC
-            leax    txtNoSDC,pc     point to have SDC
+noSDC       leax    txtNoSDC,pc     point to have SDC
 prnSDC      lbsr    Print
             ldb     <gDefFClr
             lbsr    FColor
@@ -177,6 +180,8 @@ prnSDC      lbsr    Print
             lbsr    Print
             ldb     #Green.
             lbsr    FColor
+            tst     <gCc3Fpga       Check CoCo3Fpga
+            bne     noGimeX
             clr     <gGimeX         Zero out our DMA test byte
             ldx     #gPrcDesc       Point to buffer for our descriptor
             clra
@@ -197,7 +202,7 @@ prnSDC      lbsr    Print
             sta     >$ffe8          Send to DMA (will copy to DMAByte)
             ldb     <gGimeX         get Gime-X flag
             bne     XFndMsg         found it
-            leax    txtNGimeX,pc    Point to GIME-X is not present message
+noGimeX     leax    txtNGimeX,pc    Point to GIME-X is not present message
             lbsr    Print
             bra     shw0810
 XFndMsg     leax    txtFGimeX,pc
@@ -221,7 +226,7 @@ SDR         ldb     #'S
             lda     ,s              Get GIME-X version number again
             anda    #%00111111      Keep minor version bits only (0-63)
             ldx     #gTxtBuff+2     Where to put in output string
-            bsr     NumOut          Append digits
+            lbsr    NumOut          Append digits
             puls    a               Get version number back
             lsra                    Shift major version # to least sig 2 bits
             lsra
@@ -237,6 +242,79 @@ SDR         ldb     #'S
             lbsr    Print
 shw0810     ldb     <gDefFClr
             lbsr    FColor
+
+
+* CoCo3FPGA
+            tst     <gCc3Fpga       Check CoCo3Fpga Setting
+            beq     shw0900         Completely skip if not set
+* show CoCo3FPGA if present
+            leax    txtCc3Fpga,pc
+            lbsr    Print
+            ldb     #Green.
+            lbsr    FColor
+* Check if we are on 6309 first
+            ldd     #$ffff
+            fdb     $104f           CLRD on 6309
+            tstb                    is this 6309?
+            beq     noCc3Fpga
+* Do the actual check
+* Current versions are 3.x.x and 4.x.x
+            lda     >$fff0
+            cmpa    #$30
+            blo     noCc3Fpga
+            cmpa    #$50
+            bhs     noCc3Fpga
+
+* Found a CoCo3FPGA
+            leax    txtF3Fpga,pc
+            lbsr    Print
+            pshs    a
+
+* Major
+            anda    #$f0
+            andcc   #$fe
+            rora
+            rora
+            rora
+            rora
+            adda    #$30
+            ldx     #gTxtBuff
+            sta     ,x+
+            ldb     #'.
+            stb     ,x+
+
+* Minor
+            puls    a
+            anda    #$0f
+            adda    #$30
+            sta     ,x+
+            stb     ,x+
+
+
+* Sub
+            lda     >$fff1
+            anda    #$f0
+            andcc   #$fe
+            rora
+            rora
+            rora
+            rora
+            adda    #$30
+            sta     ,x+
+
+            lda     #C$CR
+            ldb     #C$LF
+            std     ,x++
+            clra
+            sta     ,x
+            ldx     #gTxtBuff
+            bra     shw0820
+
+noCc3Fpga   leax    txtN3Fpga,pc
+shw0820     lbsr    Print
+            ldb     <gDefFClr
+            lbsr    FColor
+
 shw0900     rts
 
 * Entry: A=version # (0-63) in least sig 6 bits

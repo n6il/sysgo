@@ -48,6 +48,7 @@ gDefCYSiz:      rmb     1       console default Y size
 gDefFClr:       rmb     1       default foregornd color
 gDefBClr:       rmb     1       default backgroud color
 gDefBdClr:      rmb     1       default border color
+gCc3Fpga:       rmb     1       CoCo3FPGA Flag
 gDefPal:        rmb     16      default palette
 
                 endsect
