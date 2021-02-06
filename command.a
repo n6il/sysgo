@@ -420,16 +420,6 @@ errBdClr    coma                    set carry
 
 
 
-* Change CoCo3FPGA Variable from env.file
-*
-* Entry:
-*
-cCc3Fpga:
-            tfr     y,x             move pointer to data to X
-            lbsr    DEC_BIN         convert it
-            stb     <gCc3Fpga       save it
-            clra
-            rts
 
 
 

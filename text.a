@@ -363,9 +363,6 @@ cfgKeys:
             fdb     dfBdClr-*
             fdb     chgBdClr-*
 
-            fdb     dcc3fpga-*
-            fdb     cCc3Fpga-*
-
             fdb     0               terminater
             fdb     0
 
@@ -431,9 +428,6 @@ defmodld    fcc     /MODLOAD=/      load a module
             fcb     0
 
 defpal      fcc     /PALET/         default palette
-            fcb     0
-
-dcc3fpga    fcc     /COCO3FPGA=/     Coco3Fpga
             fcb     0
 
             endsect
